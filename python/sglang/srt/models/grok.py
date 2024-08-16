@@ -278,6 +278,7 @@ class Grok1Model(nn.Module):
         hidden_states.mul_(self.config.embedding_multiplier_scale)
 
         for i in range(len(self.layers)):
+            print(f"[tp_rank={get_tensor_model_parallel_rank()}] layer {i}")
             hidden_states = self.layers[i](positions, hidden_states, input_metadata)
         hidden_states = self.norm(hidden_states)
         hidden_states.mul_(self.config.output_multiplier_scale)
@@ -310,6 +311,7 @@ class Grok1ModelForCausalLM(nn.Module):
         input_embeds: torch.Tensor = None,
     ) -> torch.Tensor:
         hidden_states = self.model(input_ids, positions, input_metadata, input_embeds)
+        return hidden_states
         return self.logits_processor(
             input_ids, hidden_states, self.lm_head.weight, input_metadata
         )
@@ -406,3 +408,80 @@ def _prepare_presharded_weights(
 
 
 EntryClass = Grok1ModelForCausalLM
+
+
+def monkey_patch_group_coordinator():
+    from vllm.distributed.parallel_state import GroupCoordinator
+
+    def all_reduce(self, input_: torch.Tensor) -> torch.Tensor:
+        """
+        NOTE: This operation will be applied in-place or out-of-place.
+        Always assume this function modifies its input, but use the return
+        value as the output.
+        """
+        ca_comm = self.ca_comm
+
+        # Bypass the function if we are using only 1 GPU.
+        if self.world_size == 1:
+            return input_
+
+        # For TPUs, use TPU communicator.
+        tpu_comm = self.tpu_communicator
+        if tpu_comm is not None and not tpu_comm.disabled:
+            return tpu_comm.all_reduce(input_)
+
+        if ca_comm is not None:
+            out = ca_comm.custom_all_reduce(input_)
+            if out is not None:
+                return out
+        pynccl_comm = self.pynccl_comm
+        if pynccl_comm is not None and not pynccl_comm.disabled:
+            pynccl_comm.all_reduce(input_)
+        elif input_.is_cpu:
+            import intel_extension_for_pytorch as ipex
+
+            ipex.distributed.all_reduce(input_, group=self.device_group)
+        else:
+            torch.distributed.all_reduce(input_, group=self.device_group)
+        return input_
+
+    def all_gather(self, input_: torch.Tensor, dim: int = -1) -> torch.Tensor:
+        world_size = self.world_size
+        # Bypass the function if we are using only 1 GPU.
+        if world_size == 1:
+            return input_
+        assert (
+            -input_.dim() <= dim < input_.dim()
+        ), f"Invalid dim ({dim}) for input tensor with shape {input_.size()}"
+
+        # For TPUs, use TPU communicator.
+        tpu_comm = self.tpu_communicator
+        if tpu_comm is not None and not tpu_comm.disabled:
+            return tpu_comm.all_gather(input_, dim)
+
+        if dim < 0:
+            # Convert negative dim to positive.
+            dim += input_.dim()
+        input_size = input_.size()
+        # Allocate output tensor.
+        output_tensor = torch.empty(
+            (world_size,) + input_size, dtype=input_.dtype, device=input_.device
+        )
+        # All-gather.
+
+        pynccl_comm = self.pynccl_comm
+        if pynccl_comm is not None and not pynccl_comm.disabled:
+            pynccl_comm.all_reduce(input_)
+        else:
+            torch.distributed.all_gather_into_tensor(
+                output_tensor, input_, group=self.device_group
+            )
+        # Reshape
+        output_tensor = output_tensor.movedim(0, dim)
+        output_tensor = output_tensor.reshape(
+            input_size[:dim] + (world_size * input_size[dim],) + input_size[dim + 1 :]
+        )
+        return output_tensor
+
+    setattr(GroupCoordinator, "all_reduce", all_reduce)
+    setattr(GroupCoordinator, "all_gather", all_gather)

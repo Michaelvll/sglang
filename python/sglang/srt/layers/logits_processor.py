@@ -23,6 +23,7 @@ from torch import nn
 from vllm.distributed import (
     get_tensor_model_parallel_world_size,
     tensor_model_parallel_all_gather,
+    tensor_model_parallel_gather,
 )
 
 from sglang.srt.model_executor.forward_batch_info import ForwardMode, InputMetadata
@@ -159,8 +160,8 @@ class LogitsProcessor(nn.Module):
             last_hidden = hidden_states[last_index]
 
         last_logits = torch.matmul(last_hidden, weight.T)
-        if self.tp_size > 1:
-            last_logits = tensor_model_parallel_all_gather(last_logits)
+        # if self.tp_size > 1:
+        #    last_logits = tensor_model_parallel_all_gather(last_logits)
         last_logits = last_logits[:, : self.config.vocab_size].float()
 
         if hasattr(self.config, "final_logit_softcapping"):

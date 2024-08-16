@@ -395,8 +395,11 @@ class ModelRunner:
         if self.tp_rank == 0:
             print("non-cuda-graph", flush=True)
 
-        return self.model.forward(
+        ret = self.model.forward(
             batch.input_ids, input_metadata.positions, input_metadata
+        )
+        return self.model.logits_processor(
+            batch.input_ids, ret, self.model.lm_head.weight, input_metadata
         )
 
     @torch.inference_mode()
@@ -406,8 +409,11 @@ class ModelRunner:
             batch,
             forward_mode=ForwardMode.EXTEND,
         )
-        return self.model.forward(
+        ret = self.model.forward(
             batch.input_ids, input_metadata.positions, input_metadata
+        )
+        return self.model.logits_processor(
+            batch.input_ids, ret, self.model.lm_head.weight, input_metadata
         )
 
     @torch.inference_mode()

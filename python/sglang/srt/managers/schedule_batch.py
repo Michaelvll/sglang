@@ -779,6 +779,16 @@ class ScheduleBatch:
 
         self.penalizer_orchestrator.cumulate_output_tokens(batch_next_token_ids)
 
+        from vllm.distributed import (
+            get_tensor_model_parallel_world_size,
+            tensor_model_parallel_all_reduce,
+        )
+
+        batch_next_token_ids = (
+            tensor_model_parallel_all_reduce(batch_next_token_ids)
+            / get_tensor_model_parallel_world_size()
+        ).to(torch.int32)
+
         return batch_next_token_ids
 
 

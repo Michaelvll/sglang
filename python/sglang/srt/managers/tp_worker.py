@@ -626,14 +626,14 @@ class ModelTpServer:
         torch.cuda.synchronize()
         self.model_runner.tp_group.cpu_group.barrier()
         if self.tp_rank == 0:
-            print(f"decode begin {batch.batch_size}", flush=True)
+            print(f"decode begin {batch.batch_size()}", flush=True)
 
         output = self.model_runner.forward(batch, ForwardMode.DECODE)
 
         torch.cuda.synchronize()
         self.model_runner.tp_group.cpu_group.barrier()
         if self.tp_rank == 0:
-            print(f"decode end {batch.batch_size}", flush=True)
+            print(f"decode end {batch.batch_size()}", flush=True)
 
         torch.cuda.synchronize()
         self.model_runner.tp_group.cpu_group.barrier()

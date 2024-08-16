@@ -300,7 +300,10 @@ class LlamaForCausalLM(nn.Module):
         self.config = config
         self.quant_config = quant_config
         self.model = LlamaModel(config, quant_config=quant_config)
-        self.lm_head = ParallelLMHead(config.vocab_size, config.hidden_size)
+
+        from vllm.model_executor.layers.linear import ReplicatedLinear
+
+        self.lm_head = ReplicatedLinear(config.hidden_size, config.vocab_size)
         self.logits_processor = LogitsProcessor(config)
 
     @torch.no_grad()
@@ -312,6 +315,7 @@ class LlamaForCausalLM(nn.Module):
         input_embeds: torch.Tensor = None,
     ) -> LogitProcessorOutput:
         hidden_states = self.model(input_ids, positions, input_metadata, input_embeds)
+        return hidden_states
         return self.logits_processor(
             input_ids, hidden_states, self.lm_head.weight, input_metadata
         )

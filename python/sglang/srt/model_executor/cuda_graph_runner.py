@@ -289,8 +289,17 @@ class CudaGraphRunner:
         )
 
         # Replay
+        torch.cuda.synchronize()
         self.graphs[bs].replay()
         output = self.output_buffers[bs]
+        torch.cuda.synchronize()
+
+        output = self.model_runner.model.logits_processor(
+            batch.input_ids,
+            output,
+            self.model_runner.model.lm_head.weight,
+            LogitsMetadata(ForwardMode.DECODE, False),
+        )
 
         # Unpad
         if bs != raw_bs:
