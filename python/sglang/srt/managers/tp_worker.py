@@ -443,8 +443,29 @@ class ModelTpServer:
         if self.model_runner.is_generation:
             # Forward and sample the next tokens
             if batch.extend_num_tokens != 0:
+                torch.cuda.synchronize()
+                self.model_runner.tp_group.cpu_group.barrier()
+                if self.tp_rank == 0:
+                    print("prefill begin", flush=True)
+
                 output = self.model_runner.forward(batch, ForwardMode.EXTEND)
+
+                torch.cuda.synchronize()
+                self.model_runner.tp_group.cpu_group.barrier()
+                if self.tp_rank == 0:
+                    print("prefill end", flush=True)
+
+                torch.cuda.synchronize()
+                self.model_runner.tp_group.cpu_group.barrier()
+                if self.tp_rank == 0:
+                    print("sample begin", flush=True)
+
                 next_token_ids = batch.sample(output.next_token_logits)
+
+                torch.cuda.synchronize()
+                self.model_runner.tp_group.cpu_group.barrier()
+                if self.tp_rank == 0:
+                    print("sample end", flush=True)
 
                 # Move logprobs to cpu
                 if output.next_token_logprobs is not None:
@@ -602,8 +623,29 @@ class ModelTpServer:
         batch.prepare_for_decode()
 
         # Forward and sample the next tokens
+        torch.cuda.synchronize()
+        self.model_runner.tp_group.cpu_group.barrier()
+        if self.tp_rank == 0:
+            print(f"decode begin {batch.batch_size}", flush=True)
+
         output = self.model_runner.forward(batch, ForwardMode.DECODE)
+
+        torch.cuda.synchronize()
+        self.model_runner.tp_group.cpu_group.barrier()
+        if self.tp_rank == 0:
+            print(f"decode end {batch.batch_size}", flush=True)
+
+        torch.cuda.synchronize()
+        self.model_runner.tp_group.cpu_group.barrier()
+        if self.tp_rank == 0:
+            print("sample begin", flush=True)
+
         next_token_ids = batch.sample(output.next_token_logits)
+
+        torch.cuda.synchronize()
+        self.model_runner.tp_group.cpu_group.barrier()
+        if self.tp_rank == 0:
+            print("sample end", flush=True)
 
         # Move logprobs to cpu
         if output.next_token_logprobs is not None:

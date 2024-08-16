@@ -361,7 +361,7 @@ class ModelRunner:
         logger.info(
             f"[gpu={self.gpu_id}] Capture cuda graph begin. This can take up to several minutes."
         )
-        batch_size_list = [1, 2, 4] + [i * 8 for i in range(1, 17)]
+        batch_size_list = [1, 2, 4] + [i * 8 for i in range(1, 17)] + [256, 512, 1024]
         self.cuda_graph_runner = CudaGraphRunner(
             self,
             max_batch_size_to_capture=max(batch_size_list),
@@ -382,6 +382,8 @@ class ModelRunner:
     @torch.inference_mode()
     def forward_decode(self, batch: ScheduleBatch):
         if self.cuda_graph_runner and self.cuda_graph_runner.can_run(len(batch.reqs)):
+            if self.tp_rank == 0:
+                print("cuda graph", flush=True)
             return self.cuda_graph_runner.replay(batch)
 
         input_metadata = InputMetadata.from_schedule_batch(
@@ -389,6 +391,9 @@ class ModelRunner:
             batch,
             ForwardMode.DECODE,
         )
+
+        if self.tp_rank == 0:
+            print("non-cuda-graph", flush=True)
 
         return self.model.forward(
             batch.input_ids, input_metadata.positions, input_metadata

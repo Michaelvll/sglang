@@ -154,6 +154,12 @@ class CudaGraphRunner:
                     bs in self.compile_bs,
                     self.model_runner.tp_group,
                 ) as forward:
+
+                    torch.cuda.synchronize()
+                    self.model_runner.tp_group.cpu_group.barrier()
+                    if self.model_runner.tp_rank == 0:
+                        print(f"capture {bs} begin", flush=True)
+
                     (
                         graph,
                         input_buffers,
@@ -164,6 +170,11 @@ class CudaGraphRunner:
                     self.input_buffers[bs] = input_buffers
                     self.output_buffers[bs] = output_buffers
                     self.flashinfer_handlers[bs] = flashinfer_handler
+
+                    torch.cuda.synchronize()
+                    self.model_runner.tp_group.cpu_group.barrier()
+                    if self.model_runner.tp_rank == 0:
+                        print(f"capture {bs} end", flush=True)
 
     def capture_one_batch_size(self, bs, forward):
         graph = torch.cuda.CUDAGraph()
