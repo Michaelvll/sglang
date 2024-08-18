@@ -87,7 +87,7 @@ docker run --gpus all \
 1. Copy the [compose.yml](./docker/compose.yaml) to your local machine
 2. Execute the command `docker compose up -d` in your terminal.
 
-### Method 5: Run on Clouds with SkyPilot
+### Method 5: Run on Kubernetes or Cloud VMs with SkyPilot
 
 To deploy on any cloud or Kubernetes cluster, you can use [SkyPilot](https://github.com/skypilot-org/skypilot).
 
