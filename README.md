@@ -94,10 +94,10 @@ To deploy on any cloud or Kubernetes cluster, you can use [SkyPilot](https://git
 1. Install SkyPilot and setup your cloud or Kubernetes cluster: see [SkyPilot's documentation](https://skypilot.readthedocs.io/en/latest/getting-started/installation.html).
 2. Deploy on your own infra with a single command and get the HTTP API endpoint:
 <details>
-<summary>SkyPilot YAML: <code>sglang_server.yaml</code></summary>
+<summary>SkyPilot YAML: <code>sglang.yaml</code></summary>
 
 ```yaml
-# sglang_server.yaml
+# sglang.yaml
 envs:
   HF_TOKEN: null
 
@@ -118,7 +118,7 @@ run: |
 
 ```bash
 # Deploy on any cloud or Kubernetes cluster, use --cloud <cloud> to select a specific cloud provider.
-HF_TOKEN=<secret> sky launch -c sglang --env HF_TOKEN sglang_server.yaml
+HF_TOKEN=<secret> sky launch -c sglang --env HF_TOKEN sglang.yaml
 
 # Get the HTTP API endpoint
 sky status --endpoint 30000 sglang
