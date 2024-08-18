@@ -117,7 +117,7 @@ run: |
 </details>
 
 ```bash
-# Deploy on any cloud or Kubernetes cluster, use --cloud <cloud> to select a specific cloud provider.
+# Deploy on any cloud or Kubernetes cluster. Use --cloud <cloud> to select a specific cloud provider.
 HF_TOKEN=<secret> sky launch -c sglang --env HF_TOKEN sglang.yaml
 
 # Get the HTTP API endpoint
